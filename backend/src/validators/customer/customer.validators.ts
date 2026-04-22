@@ -2,11 +2,13 @@ import { z } from "zod";
 
 export const addToCartSchema = z.object({
   productId: z.string().min(1),
+  variantSku: z.string().min(1).optional(),
   quantity: z.number().int().min(1).max(100),
 });
 
 export const updateCartItemSchema = z.object({
   quantity: z.number().int().min(0).max(100),
+  variantSku: z.string().min(1).optional(),
 });
 
 export const addressSchema = z.object({

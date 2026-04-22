@@ -3,6 +3,7 @@ import mongoose, { Schema, Document, Types } from "mongoose";
 export interface ICartItem {
   productId: Types.ObjectId;
   vendorId: Types.ObjectId;
+  variantSku?: string;
   quantity: number;
   priceAtAdd: number;
 }
@@ -18,6 +19,7 @@ const cartItemSchema = new Schema<ICartItem>(
   {
     productId: { type: Schema.Types.ObjectId, ref: "Product", required: true },
     vendorId: { type: Schema.Types.ObjectId, ref: "Vendor", required: true },
+    variantSku: { type: String },
     quantity: { type: Number, required: true, min: 1 },
     priceAtAdd: { type: Number, required: true },
   },

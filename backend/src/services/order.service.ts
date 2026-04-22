@@ -17,7 +17,7 @@ export function generateOrderNumber(): string {
 
 export interface BuildOrderInput {
   customerId: Types.ObjectId | string;
-  items: { productId: string; quantity: number }[];
+  items: { productId: string; quantity: number; variantSku?: string }[];
   shippingAddress: {
     fullName: string;
     phone: string;
@@ -54,18 +54,43 @@ export async function buildOrder(input: BuildOrderInput) {
   for (const line of input.items) {
     const p = productMap.get(line.productId);
     if (!p) throw ApiError.badRequest(`Product not found or inactive: ${line.productId}`);
-    if (p.stock < line.quantity) {
+
+    let price = p.price;
+    let availableStock = p.stock;
+    let variantSku: string | undefined;
+    let variantAttributes: Record<string, string> | undefined;
+    let image = p.images?.[0];
+
+    if (line.variantSku) {
+      const variant = p.variants?.find((v) => v.sku === line.variantSku);
+      if (!variant) {
+        throw ApiError.badRequest(
+          `Variant ${line.variantSku} not found on ${p.name}`
+        );
+      }
+      price = variant.price;
+      availableStock = variant.stock;
+      variantSku = variant.sku;
+      variantAttributes = variant.attributes;
+      if (variant.image) image = variant.image;
+    } else if (p.variants && p.variants.length > 0) {
+      throw ApiError.badRequest(`Please select a variant for ${p.name}`);
+    }
+
+    if (availableStock < line.quantity) {
       throw ApiError.badRequest(`Insufficient stock for ${p.name}`);
     }
-    const subtotal = round2(p.price * line.quantity);
+    const subtotal = round2(price * line.quantity);
     items.push({
       productId: p._id as Types.ObjectId,
       vendorId: p.vendorId,
       name: p.name,
       sku: p.sku,
-      image: p.images?.[0],
+      variantSku,
+      variantAttributes,
+      image,
       quantity: line.quantity,
-      price: p.price,
+      price,
       subtotal,
     });
     const key = String(p.vendorId);

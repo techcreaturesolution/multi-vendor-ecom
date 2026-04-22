@@ -93,7 +93,11 @@ export const createOrder = asyncHandler(async (req: Request, res: Response) => {
 
   const order = await buildOrder({
     customerId: req.user!.sub,
-    items: cart.items.map((i) => ({ productId: String(i.productId), quantity: i.quantity })),
+    items: cart.items.map((i) => ({
+      productId: String(i.productId),
+      quantity: i.quantity,
+      variantSku: i.variantSku,
+    })),
     shippingAddress: {
       fullName: address.fullName,
       phone: address.phone,

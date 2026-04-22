@@ -139,8 +139,17 @@ async function attemptRefund(rr: InstanceType<typeof ReturnRequest>): Promise<vo
       await order.save();
     }
   } catch (err) {
-    logger.error(`Razorpay refund failed: ${err instanceof Error ? err.message : String(err)}`);
-    rr.refundStatus = "failed";
-    rr.refundError = err instanceof Error ? err.message : String(err);
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.error(`Razorpay refund failed: ${msg}`);
+    if (rr.gatewayRefundId) {
+      // The gateway refund itself already succeeded (we have the refund id);
+      // the exception came from a subsequent bookkeeping save. Don't flip
+      // refundStatus back to "failed" — that would mislead the admin into
+      // retrying and risk a double refund. Just record the bookkeeping error.
+      rr.refundError = `Refund processed at gateway but bookkeeping save failed: ${msg}`;
+    } else {
+      rr.refundStatus = "failed";
+      rr.refundError = msg;
+    }
   }
 }

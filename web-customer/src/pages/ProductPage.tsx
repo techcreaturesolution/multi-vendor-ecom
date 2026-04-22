@@ -44,8 +44,16 @@ export default function ProductPage() {
       return;
     }
     if (!product) return;
+    if (product.variants && product.variants.length > 0 && !selectedVariant) {
+      toast.error("Please select a variant");
+      return;
+    }
     try {
-      await api.post("/api/customer/cart/items", { productId: product._id, quantity: qty });
+      await api.post("/api/customer/cart/items", {
+        productId: product._id,
+        quantity: qty,
+        variantSku: selectedVariant || undefined,
+      });
       toast.success("Added to cart");
       navigate("/cart");
     } catch (err: unknown) {
