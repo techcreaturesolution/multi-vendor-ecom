@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../api/api_client.dart';
 import '../state/auth_state.dart';
+import '../util/image_url.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -12,6 +13,7 @@ class CartScreen extends StatefulWidget {
 
 class _CartScreenState extends State<CartScreen> {
   Map<String, dynamic>? cart;
+  bool mutating = false;
 
   @override
   void initState() {
@@ -26,6 +28,38 @@ class _CartScreenState extends State<CartScreen> {
     } catch (_) {}
   }
 
+  Future<void> _updateQty(String productId, int qty) async {
+    setState(() => mutating = true);
+    try {
+      await ApiClient.instance.dio.patch(
+        '/api/customer/cart/items/$productId',
+        data: {'quantity': qty},
+      );
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Failed: $e')));
+    } finally {
+      if (mounted) setState(() => mutating = false);
+    }
+  }
+
+  Future<void> _remove(String productId) async {
+    setState(() => mutating = true);
+    try {
+      await ApiClient.instance.dio
+          .delete('/api/customer/cart/items/$productId');
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Failed: $e')));
+    } finally {
+      if (mounted) setState(() => mutating = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthState>();
@@ -38,7 +72,10 @@ class _CartScreenState extends State<CartScreen> {
             children: [
               const Text('Sign in to view your cart'),
               const SizedBox(height: 12),
-              FilledButton(onPressed: () => context.go('/login'), child: const Text('Sign in')),
+              FilledButton(
+                onPressed: () => context.go('/login'),
+                child: const Text('Sign in'),
+              ),
             ],
           ),
         ),
@@ -61,11 +98,65 @@ class _CartScreenState extends State<CartScreen> {
               separatorBuilder: (_, __) => const Divider(height: 1),
               itemBuilder: (_, i) {
                 final it = items[i];
-                final p = it['productId'];
+                final p = it['productId'] as Map<String, dynamic>;
+                final qty = (it['quantity'] as num).toInt();
+                final imgs = (p['images'] as List? ?? []);
                 return ListTile(
+                  leading: SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: imgs.isNotEmpty
+                        ? Image.network(
+                            imageUrl(imgs[0]),
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                                color: Colors.grey[200],
+                                child: const Icon(Icons.image_outlined)),
+                          )
+                        : Container(
+                            color: Colors.grey[200],
+                            child: const Icon(Icons.image_outlined)),
+                  ),
                   title: Text(p['name']),
-                  subtitle: Text('₹${p['price']} x ${it['quantity']}'),
-                  trailing: Text('₹${(p['price'] * it['quantity']).toString()}'),
+                  subtitle: Text('₹${p['price']} each'),
+                  trailing: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '₹${(p['price'] * qty).toString()}',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            icon: const Icon(Icons.remove_circle_outline,
+                                size: 20),
+                            onPressed: mutating || qty <= 1
+                                ? null
+                                : () => _updateQty(p['_id'], qty - 1),
+                          ),
+                          Text('$qty'),
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            icon: const Icon(Icons.add_circle_outline, size: 20),
+                            onPressed: mutating
+                                ? null
+                                : () => _updateQty(p['_id'], qty + 1),
+                          ),
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            icon: const Icon(Icons.delete_outline,
+                                size: 20, color: Colors.red),
+                            onPressed:
+                                mutating ? null : () => _remove(p['_id']),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 );
               },
             ),
@@ -81,7 +172,9 @@ class _CartScreenState extends State<CartScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text('Subtotal'),
-                          Text('₹$subtotal', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                          Text('₹$subtotal',
+                              style: const TextStyle(
+                                  fontSize: 18, fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),

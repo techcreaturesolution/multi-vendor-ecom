@@ -102,7 +102,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           const Text('Ship to', style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           if (addresses.isEmpty)
-            const Text('No saved addresses. Add one from the web portal for now.')
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('No saved addresses yet.'),
+                const SizedBox(height: 8),
+                FilledButton.tonalIcon(
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add address'),
+                  onPressed: () async {
+                    await context.push('/addresses');
+                    _loadAddresses();
+                  },
+                ),
+              ],
+            )
           else
             ...addresses.map(
               (a) => RadioListTile<String>(

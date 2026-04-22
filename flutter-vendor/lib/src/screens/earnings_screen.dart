@@ -32,6 +32,28 @@ class _EarningsScreenState extends State<EarningsScreen> {
     }
   }
 
+  Widget _kv(String k, dynamic v) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          children: [
+            Expanded(child: Text(k, style: const TextStyle(color: Colors.grey))),
+            Text('₹${v ?? 0}'),
+          ],
+        ),
+      );
+
+  Widget _bucket(String label, Map<String, dynamic>? b) {
+    b ??= {'count': 0, 'gross': 0, 'net': 0};
+    return Card(
+      child: ListTile(
+        title: Text(label.toUpperCase()),
+        subtitle: Text('${b['count']} orders · gross ₹${b['gross']}'),
+        trailing: Text('₹${b['net']}',
+            style: const TextStyle(fontWeight: FontWeight.bold)),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -41,27 +63,52 @@ class _EarningsScreenState extends State<EarningsScreen> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                if (summary != null)
-                  ...['pending', 'processing', 'paid'].map(
-                    (k) => Card(
-                      child: ListTile(
-                        title: Text(k.toUpperCase()),
-                        subtitle: Text(
-                          '${summary![k]['count']} orders · gross ₹${summary![k]['gross']}',
-                        ),
-                        trailing: Text('₹${summary![k]['net']}'),
+                if (summary != null) ...[
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Summary',
+                              style: TextStyle(fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 8),
+                          _kv('Gross sales', summary!['grossSales']),
+                          _kv('Shipping', summary!['totalShipping']),
+                          _kv('Admin commission', summary!['totalCommission']),
+                          const Divider(),
+                          _kv('Net earnings', summary!['netEarnings']),
+                          _kv('Pending payout', summary!['pendingPayout']),
+                          _kv('Paid out', summary!['paidOut']),
+                        ],
                       ),
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  const Text('By status',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  _bucket('pending',
+                      (summary!['buckets'] ?? {})['pending'] as Map<String, dynamic>?),
+                  _bucket('processing',
+                      (summary!['buckets'] ?? {})['processing'] as Map<String, dynamic>?),
+                  _bucket('paid',
+                      (summary!['buckets'] ?? {})['paid'] as Map<String, dynamic>?),
+                ],
                 const SizedBox(height: 16),
-                const Text('Payout history', style: TextStyle(fontWeight: FontWeight.bold)),
-                if (payouts.isEmpty) const Padding(padding: EdgeInsets.all(8), child: Text('No payouts yet')),
+                const Text('Payout history',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                if (payouts.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: Text('No payouts yet'),
+                  ),
                 for (final p in payouts)
                   Card(
                     child: ListTile(
                       title: Text('₹${p['netPayable']}'),
                       subtitle: Text('${p['status']} · ${p['periodStart']}'),
-                      trailing: p['utrNumber'] != null ? Text(p['utrNumber']) : null,
+                      trailing:
+                          p['utrNumber'] != null ? Text(p['utrNumber']) : null,
                     ),
                   ),
               ],

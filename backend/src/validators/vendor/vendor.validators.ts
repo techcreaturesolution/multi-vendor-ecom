@@ -6,7 +6,15 @@ export const createProductSchema = z.object({
   description: z.string().min(10),
   shortDescription: z.string().optional(),
   categoryId: z.string().min(1),
-  images: z.array(z.string().url()).default([]),
+  // Accept either absolute URLs (CDN / remote) or relative paths served by
+  // the backend at /uploads/... so our internal upload endpoint works.
+  images: z
+    .array(
+      z.string().refine((v) => /^https?:\/\//.test(v) || v.startsWith("/uploads/"), {
+        message: "Image must be an absolute URL or /uploads/... path",
+      })
+    )
+    .default([]),
   price: z.number().min(0),
   compareAtPrice: z.number().min(0).optional(),
   sku: z.string().min(1),
