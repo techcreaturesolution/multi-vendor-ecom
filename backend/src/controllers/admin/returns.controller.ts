@@ -39,6 +39,34 @@ export const getOne = asyncHandler(async (req: Request, res: Response) => {
 });
 
 /**
+ * Atomically claim a ReturnRequest for a Razorpay refund attempt. Returns
+ * the claimed doc, or null if another request already has the claim (or
+ * the gateway refund has already been issued). Using findOneAndUpdate
+ * guarantees that two concurrent callers cannot both proceed to the
+ * external Razorpay API for the same return.
+ */
+async function claimForRefund(
+  id: string,
+  extraSet: Record<string, unknown> = {}
+) {
+  return ReturnRequest.findOneAndUpdate(
+    {
+      _id: id,
+      gatewayRefundId: { $in: [null, undefined, ""] },
+      refundStatus: { $ne: "processing" },
+    },
+    {
+      $set: { refundStatus: "processing", ...extraSet },
+      // `$set: { refundError: undefined }` is silently dropped by the
+      // MongoDB driver's `ignoreUndefined` default — use $unset instead
+      // so any prior error actually clears as the new attempt begins.
+      $unset: { refundError: 1 },
+    },
+    { new: true }
+  );
+}
+
+/**
  * Admin transitions a return request. When the target is `refunded` we also
  * attempt a Razorpay refund against the captured payment. We never block the
  * status transition on a gateway error — we record the error and expose it so
@@ -51,20 +79,59 @@ export const setStatus = asyncHandler(async (req: Request, res: Response) => {
     refundAmount?: number;
   };
 
+  if (status === "refunded") {
+    // Atomic claim so two concurrent "mark refunded" requests cannot both
+    // reach the Razorpay API. The claim also lays down status=refunded,
+    // vendorNote, refundAmount, and resolvedAt in the same write so callers
+    // see consistent state.
+    const set: Record<string, unknown> = {
+      status: "refunded",
+      resolvedAt: new Date(),
+    };
+    if (vendorNote !== undefined) set.vendorNote = vendorNote;
+    if (refundAmount !== undefined) set.refundAmount = refundAmount;
+
+    const rr = await claimForRefund(req.params.id, set);
+    if (!rr) {
+      const existing = await ReturnRequest.findById(req.params.id);
+      if (!existing) throw ApiError.notFound("Return request not found");
+      if (existing.gatewayRefundId) {
+        // Already refunded at the gateway — idempotently apply the non-
+        // refund fields (note / recorded amount) without re-issuing.
+        if (vendorNote !== undefined) existing.vendorNote = vendorNote;
+        if (refundAmount !== undefined) existing.refundAmount = refundAmount;
+        existing.status = "refunded";
+        existing.resolvedAt = existing.resolvedAt || new Date();
+        await existing.save();
+        const populated = await ReturnRequest.findById(existing._id)
+          .populate("vendorId", "businessName")
+          .populate("customerId", "name email phone")
+          .populate("orderId", "orderNumber grandTotal status");
+        res.json({ success: true, data: populated });
+        return;
+      }
+      throw ApiError.badRequest("A refund attempt is already in progress");
+    }
+
+    await attemptRefund(rr);
+    await rr.save();
+
+    const populated = await ReturnRequest.findById(rr._id)
+      .populate("vendorId", "businessName")
+      .populate("customerId", "name email phone")
+      .populate("orderId", "orderNumber grandTotal status");
+    res.json({ success: true, data: populated });
+    return;
+  }
+
+  // Non-refund transitions do not call any external API, so a simple
+  // read-modify-write is fine.
   const rr = await ReturnRequest.findById(req.params.id);
   if (!rr) throw ApiError.notFound("Return request not found");
-
   rr.status = status;
   if (vendorNote !== undefined) rr.vendorNote = vendorNote;
   if (refundAmount !== undefined) rr.refundAmount = refundAmount;
-  if (status === "rejected" || status === "refunded") {
-    rr.resolvedAt = new Date();
-  }
-
-  if (status === "refunded" && !rr.gatewayRefundId) {
-    await attemptRefund(rr);
-  }
-
+  if (status === "rejected") rr.resolvedAt = new Date();
   await rr.save();
 
   const populated = await ReturnRequest.findById(rr._id)
@@ -79,24 +146,12 @@ export const setStatus = asyncHandler(async (req: Request, res: Response) => {
  * state but for which the gateway call previously failed (or was never made
  * because Razorpay was not configured at the time).
  *
- * The claim step uses a single atomic findOneAndUpdate: it will only succeed
- * if the document still has no gatewayRefundId and is not currently marked
- * "processing". This closes the TOCTOU race that a double-click of the retry
- * button would otherwise open.
+ * Shares the same atomic claim with setStatus so a double-click or a
+ * concurrent setStatus + retryRefund cannot both reach the gateway.
  */
 export const retryRefund = asyncHandler(async (req: Request, res: Response) => {
-  const rr = await ReturnRequest.findOneAndUpdate(
-    {
-      _id: req.params.id,
-      status: "refunded",
-      gatewayRefundId: { $in: [null, undefined, ""] },
-      refundStatus: { $ne: "processing" },
-    },
-    { $set: { refundStatus: "processing", refundError: undefined } },
-    { new: true }
-  );
+  const rr = await claimForRefund(req.params.id);
   if (!rr) {
-    // Disambiguate why the claim failed so the admin gets a useful message.
     const existing = await ReturnRequest.findById(req.params.id);
     if (!existing) throw ApiError.notFound("Return request not found");
     if (existing.status !== "refunded") {
@@ -110,6 +165,17 @@ export const retryRefund = asyncHandler(async (req: Request, res: Response) => {
       );
     }
     throw ApiError.badRequest("A refund attempt is already in progress");
+  }
+  // retryRefund only retries; it does not change status. But if the atomic
+  // claim matched a doc whose status wasn't already "refunded" we bail out
+  // rather than silently refunding a non-refunded return.
+  if (rr.status !== "refunded") {
+    // Release the claim and refuse.
+    rr.refundStatus = undefined;
+    await rr.save();
+    throw ApiError.badRequest(
+      "Return must be in refunded state before refunding"
+    );
   }
 
   await attemptRefund(rr);
