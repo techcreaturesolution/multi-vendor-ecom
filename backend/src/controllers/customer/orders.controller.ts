@@ -71,24 +71,39 @@ export const createReview = asyncHandler(async (req: Request, res: Response) => 
 });
 
 export const createReturn = asyncHandler(async (req: Request, res: Response) => {
-  const { orderId, items } = req.body;
+  const { orderId, items } = req.body as {
+    orderId: string;
+    items: { productId: string; quantity: number; reason: string }[];
+  };
   const order = await Order.findOne({ _id: orderId, customerId: req.user!.sub });
   if (!order) throw ApiError.notFound("Order not found");
   if (order.status !== "delivered") {
     throw ApiError.badRequest("Only delivered orders can be returned");
   }
 
-  // Use the first vendor in the items as return request owner; multi-vendor
-  // returns would need multiple requests (one per vendor)
-  const firstItem = order.items.find((i) => String(i.productId) === items[0].productId);
-  if (!firstItem) throw ApiError.badRequest("Product not in order");
+  // Group the requested items by their vendor and create one ReturnRequest
+  // per vendor so every affected vendor sees their slice.
+  const byVendor = new Map<string, typeof items>();
+  for (const ri of items) {
+    const orderItem = order.items.find((i) => String(i.productId) === ri.productId);
+    if (!orderItem) throw ApiError.badRequest(`Product ${ri.productId} not in order`);
+    const vendorKey = String(orderItem.vendorId);
+    const bucket = byVendor.get(vendorKey) ?? [];
+    bucket.push(ri);
+    byVendor.set(vendorKey, bucket);
+  }
 
-  const rr = await ReturnRequest.create({
-    orderId,
-    customerId: req.user!.sub,
-    vendorId: firstItem.vendorId,
-    items,
-    status: "requested",
-  });
-  res.status(201).json({ success: true, data: rr });
+  const created = await Promise.all(
+    Array.from(byVendor.entries()).map(([vendorId, vendorItems]) =>
+      ReturnRequest.create({
+        orderId,
+        customerId: req.user!.sub,
+        vendorId,
+        items: vendorItems,
+        status: "requested",
+      })
+    )
+  );
+
+  res.status(201).json({ success: true, data: created });
 });

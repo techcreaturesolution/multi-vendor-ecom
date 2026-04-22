@@ -1,5 +1,13 @@
 import { z } from "zod";
 
+// Accept either a full ISO 8601 datetime ("2026-04-22T00:00:00.000Z") or a
+// date-only string ("2026-04-22") that `new Date(...)` can parse. HTML
+// `<input type="date">` emits the latter.
+const isoDateLike = z
+  .string()
+  .min(1)
+  .refine((v) => !Number.isNaN(Date.parse(v)), { message: "Invalid date" });
+
 export const createCategorySchema = z.object({
   name: z.string().min(2).max(100),
   slug: z.string().min(2).max(100).regex(/^[a-z0-9-]+$/),
@@ -20,8 +28,8 @@ export const approveVendorSchema = z.object({
 export const createMouSchema = z.object({
   vendorId: z.string().min(1),
   adminCommissionPercent: z.number().min(0).max(100),
-  effectiveFrom: z.string().datetime(),
-  effectiveTo: z.string().datetime().optional(),
+  effectiveFrom: isoDateLike,
+  effectiveTo: isoDateLike.optional(),
   terms: z.string().min(1),
   documentUrl: z.string().url().optional(),
 });
@@ -32,10 +40,12 @@ export const updateUserStatusSchema = z.object({
 
 export const generatePayoutSchema = z.object({
   vendorId: z.string().min(1),
-  periodStart: z.string().datetime(),
-  periodEnd: z.string().datetime(),
+  periodStart: isoDateLike,
+  periodEnd: isoDateLike,
 });
 
 export const markPayoutPaidSchema = z.object({
   utrNumber: z.string().min(1),
 });
+
+export { isoDateLike };

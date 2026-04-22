@@ -5,6 +5,16 @@ import { asyncHandler } from "../../utils/asyncHandler";
 import { parsePagination, paginatedResponse } from "../../utils/pagination";
 import { getApprovedVendorForRequest } from "./helpers";
 
+interface Bucket {
+  count: number;
+  gross: number;
+  shipping: number;
+  commission: number;
+  net: number;
+}
+
+const emptyBucket: Bucket = { count: 0, gross: 0, shipping: 0, commission: 0, net: 0 };
+
 export const summary = asyncHandler(async (req: Request, res: Response) => {
   const vendor = await getApprovedVendorForRequest(req);
 
@@ -24,18 +34,37 @@ export const summary = asyncHandler(async (req: Request, res: Response) => {
     },
   ]);
 
-  const buckets: Record<string, { count: number; gross: number; net: number }> = {};
+  const buckets: Record<string, Bucket> = {};
   for (const a of agg) {
-    buckets[a._id as string] = { count: a.count, gross: a.gross, net: a.net };
+    buckets[a._id as string] = {
+      count: a.count,
+      gross: a.gross,
+      shipping: a.shipping,
+      commission: a.commission,
+      net: a.net,
+    };
   }
+  const pending = buckets.pending || emptyBucket;
+  const processing = buckets.processing || emptyBucket;
+  const paid = buckets.paid || emptyBucket;
+
+  const grossSales = pending.gross + processing.gross + paid.gross;
+  const totalShipping = pending.shipping + processing.shipping + paid.shipping;
+  const totalCommission = pending.commission + processing.commission + paid.commission;
+  const netEarnings = pending.net + processing.net + paid.net;
 
   res.json({
     success: true,
     data: {
       vendorId: vendor._id,
-      pending: buckets.pending || { count: 0, gross: 0, net: 0 },
-      processing: buckets.processing || { count: 0, gross: 0, net: 0 },
-      paid: buckets.paid || { count: 0, gross: 0, net: 0 },
+      grossSales,
+      totalShipping,
+      totalCommission,
+      netEarnings,
+      pendingPayout: pending.net,
+      paidOut: paid.net,
+      // Raw buckets kept for future UIs that want per-status breakdowns.
+      buckets: { pending, processing, paid },
     },
   });
 });

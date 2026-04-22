@@ -32,12 +32,21 @@ export const list = asyncHandler(async (req: Request, res: Response) => {
   const users = await User.find({ _id: { $in: userIds } });
   const userMap = new Map(users.map((u) => [String(u._id), u]));
 
-  const data = agg.map((a) => ({
-    customer: userMap.get(String(a._id)),
-    orderCount: a.orderCount,
-    totalSpent: a.totalSpent,
-    lastOrderAt: a.lastOrderAt,
-  }));
+  const data = agg
+    .map((a) => {
+      const u = userMap.get(String(a._id));
+      if (!u) return null;
+      return {
+        _id: u._id,
+        name: u.name,
+        email: u.email,
+        phone: u.phone,
+        orderCount: a.orderCount,
+        totalSpent: a.totalSpent,
+        lastOrderAt: a.lastOrderAt,
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null);
 
   const totalAgg = await Order.aggregate([
     { $match: { "vendorSplits.vendorId": vendor._id } },
