@@ -50,7 +50,10 @@ jobs:
           flutter-version: "3.24.0"
       - name: Generate platform folders
         working-directory: ${{ matrix.app }}
-        run: flutter create --project-name "${{ matrix.app == 'flutter-customer' && 'mve_customer' || 'mve_vendor' }}" .
+        run: |
+          flutter create --project-name "${{ matrix.app == 'flutter-customer' && 'mve_customer' || 'mve_vendor' }}" .
+          # The scaffolded test/widget_test.dart references MyApp which we don't have.
+          rm -rf test
       - run: flutter pub get
         working-directory: ${{ matrix.app }}
       - run: flutter analyze --no-fatal-infos
