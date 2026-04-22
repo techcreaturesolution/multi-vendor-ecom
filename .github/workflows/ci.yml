@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+        working-directory: backend
+      - run: npx tsc --noEmit
+        working-directory: backend
+
+  web:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: [web-admin, web-vendor, web-customer]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: ${{ matrix.app }}/package-lock.json
+      - run: npm ci
+        working-directory: ${{ matrix.app }}
+      - run: npx tsc -b
+        working-directory: ${{ matrix.app }}
+
+  flutter:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: [flutter-customer, flutter-vendor]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.24.0"
+      - run: flutter create .
+        working-directory: ${{ matrix.app }}
+      - run: flutter pub get
+        working-directory: ${{ matrix.app }}
+      - run: flutter analyze --no-fatal-infos
+        working-directory: ${{ matrix.app }}

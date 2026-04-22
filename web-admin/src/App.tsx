@@ -5,7 +5,9 @@ import Layout from "./components/Layout";
 import DashboardPage from "./pages/DashboardPage";
 import CategoriesPage from "./pages/CategoriesPage";
 import VendorsPage from "./pages/VendorsPage";
-import PlaceholderPage from "./pages/PlaceholderPage";
+import MousPage from "./pages/MousPage";
+import CustomersPage from "./pages/CustomersPage";
+import PayoutsPage from "./pages/PayoutsPage";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const user = useAuthStore((s) => s.user);
@@ -28,9 +30,9 @@ export default function App() {
         <Route index element={<DashboardPage />} />
         <Route path="categories" element={<CategoriesPage />} />
         <Route path="vendors" element={<VendorsPage />} />
-        <Route path="mous" element={<PlaceholderPage title="MOUs" />} />
-        <Route path="customers" element={<PlaceholderPage title="Customers" />} />
-        <Route path="payouts" element={<PlaceholderPage title="Payouts" />} />
+        <Route path="mous" element={<MousPage />} />
+        <Route path="customers" element={<CustomersPage />} />
+        <Route path="payouts" element={<PayoutsPage />} />
       </Route>
     </Routes>
   );
