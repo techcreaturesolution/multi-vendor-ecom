@@ -85,8 +85,14 @@ export const retryRefund = asyncHandler(async (req: Request, res: Response) => {
   if (rr.status !== "refunded") {
     throw ApiError.badRequest("Return must be in refunded state before refunding");
   }
-  if (rr.gatewayRefundId && rr.refundStatus === "processed") {
-    throw ApiError.badRequest("Refund already processed");
+  // The gateway call itself is the source of truth for idempotency. Even if
+  // a bookkeeping save failed after a successful refund (leaving us with
+  // gatewayRefundId set but refundStatus !== "processed"), we must not issue
+  // a second refund to Razorpay. Block on gatewayRefundId alone.
+  if (rr.gatewayRefundId) {
+    throw ApiError.badRequest(
+      `Refund already issued at the gateway (${rr.gatewayRefundId})`
+    );
   }
   await attemptRefund(rr);
   await rr.save();

@@ -44,7 +44,14 @@ export function parseCsv(input: string): string[][] {
       continue;
     }
     if (ch === "\r") {
-      // swallow \r; the following \n (if any) will commit the row
+      // Treat \r\n as a single row delimiter (let \n commit the row), but
+      // commit immediately on a bare \r (classic Mac line endings).
+      if (input[i + 1] !== "\n") {
+        cur.push(field);
+        rows.push(cur);
+        cur = [];
+        field = "";
+      }
       i++;
       continue;
     }
