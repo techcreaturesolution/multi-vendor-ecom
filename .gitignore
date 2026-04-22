@@ -10,6 +10,7 @@ build/
 coverage/
 .next/
 .turbo/
+*.tsbuildinfo
 
 # Flutter
 **/.dart_tool/
