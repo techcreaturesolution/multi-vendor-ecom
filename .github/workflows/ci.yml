@@ -48,8 +48,9 @@ jobs:
         with:
           channel: stable
           flutter-version: "3.24.0"
-      - run: flutter create .
+      - name: Generate platform folders
         working-directory: ${{ matrix.app }}
+        run: flutter create --project-name "${{ matrix.app == 'flutter-customer' && 'mve_customer' || 'mve_vendor' }}" .
       - run: flutter pub get
         working-directory: ${{ matrix.app }}
       - run: flutter analyze --no-fatal-infos
