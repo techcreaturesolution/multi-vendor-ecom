@@ -8,14 +8,7 @@ import { ApiError } from "../utils/apiError";
 const uploadRoot = path.resolve(env.upload.dir);
 if (!fs.existsSync(uploadRoot)) fs.mkdirSync(uploadRoot, { recursive: true });
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadRoot),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase().slice(0, 10);
-    cb(null, `${Date.now()}-${uuid()}${ext}`);
-  },
-});
-
+const ALLOWED_EXT = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif"]);
 const ALLOWED_MIME = new Set([
   "image/jpeg",
   "image/jpg",
@@ -23,6 +16,24 @@ const ALLOWED_MIME = new Set([
   "image/webp",
   "image/gif",
 ]);
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, uploadRoot),
+  filename: (_req, file, cb) => {
+    // Never trust the client-provided extension: the stored filename is
+    // what the static middleware uses to set Content-Type, so an attacker
+    // could upload `evil.html` with `mimetype: image/jpeg` and achieve
+    // stored XSS. Validate and normalise the extension here.
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!ALLOWED_EXT.has(ext)) {
+      return cb(
+        new ApiError(400, "Only JPG, PNG, WEBP, or GIF images are allowed"),
+        ""
+      );
+    }
+    cb(null, `${Date.now()}-${uuid()}${ext}`);
+  },
+});
 
 export const uploadImage = multer({
   storage,

@@ -162,7 +162,7 @@ export default function ReturnsPage() {
                 ))}
               </ul>
 
-              {(rr.refundAmount || rr.vendorNote) && (
+              {(rr.refundAmount != null || rr.vendorNote) && (
                 <div className="mt-3 text-sm text-gray-700 bg-gray-50 rounded-md p-2">
                   {rr.refundAmount != null && (
                     <div>
