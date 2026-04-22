@@ -1,6 +1,15 @@
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/auth";
-import { LayoutGrid, Tags, Store, Users, Wallet, FileText, LogOut } from "lucide-react";
+import {
+  LayoutGrid,
+  Tags,
+  Store,
+  Users,
+  Wallet,
+  FileText,
+  LogOut,
+  Undo2,
+} from "lucide-react";
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutGrid },
@@ -9,6 +18,7 @@ const nav = [
   { to: "/mous", label: "MOUs", icon: FileText },
   { to: "/customers", label: "Customers", icon: Users },
   { to: "/payouts", label: "Payouts", icon: Wallet },
+  { to: "/returns", label: "Returns", icon: Undo2 },
 ];
 
 export default function Layout() {

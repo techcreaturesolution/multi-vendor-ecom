@@ -7,14 +7,17 @@ import * as mou from "../../controllers/admin/mou.controller";
 import * as customers from "../../controllers/admin/customers.controller";
 import * as payouts from "../../controllers/admin/payouts.controller";
 import * as reports from "../../controllers/admin/reports.controller";
+import * as returns from "../../controllers/admin/returns.controller";
 import {
   createCategorySchema,
   updateCategorySchema,
   approveVendorSchema,
   createMouSchema,
+  updateMouSchema,
   updateUserStatusSchema,
   generatePayoutSchema,
   markPayoutPaidSchema,
+  setReturnStatusSchema,
 } from "../../validators/admin/admin.validators";
 
 const router = Router();
@@ -41,6 +44,7 @@ router.patch("/vendors/:id/status", validate(updateUserStatusSchema), vendors.se
 router.get("/mous", mou.list);
 router.get("/mous/:id", mou.getOne);
 router.post("/mous", validate(createMouSchema), mou.create);
+router.patch("/mous/:id", validate(updateMouSchema), mou.update);
 router.post("/mous/:id/deactivate", mou.deactivate);
 
 // Customers
@@ -53,5 +57,10 @@ router.get("/payouts", payouts.list);
 router.get("/payouts/:id", payouts.getOne);
 router.post("/payouts/generate", validate(generatePayoutSchema), payouts.generate);
 router.post("/payouts/:id/mark-paid", validate(markPayoutPaidSchema), payouts.markPaid);
+
+// Returns
+router.get("/returns", returns.list);
+router.get("/returns/:id", returns.getOne);
+router.patch("/returns/:id/status", validate(setReturnStatusSchema), returns.setStatus);
 
 export default router;

@@ -58,3 +58,27 @@ export const deactivate = asyncHandler(async (req: Request, res: Response) => {
   if (!mou) throw ApiError.notFound("MOU not found");
   res.json({ success: true, data: mou });
 });
+
+export const update = asyncHandler(async (req: Request, res: Response) => {
+  const { adminCommissionPercent, effectiveFrom, effectiveTo, terms, documentUrl } = req.body as {
+    adminCommissionPercent?: number;
+    effectiveFrom?: string;
+    effectiveTo?: string;
+    terms?: string;
+    documentUrl?: string;
+  };
+
+  const update: Record<string, unknown> = {};
+  if (adminCommissionPercent !== undefined) update.adminCommissionPercent = adminCommissionPercent;
+  if (effectiveFrom !== undefined) update.effectiveFrom = new Date(effectiveFrom);
+  if (effectiveTo !== undefined) update.effectiveTo = effectiveTo ? new Date(effectiveTo) : null;
+  if (terms !== undefined) update.terms = terms;
+  if (documentUrl !== undefined) update.documentUrl = documentUrl;
+
+  const mou = await MOU.findByIdAndUpdate(req.params.id, update, { new: true }).populate(
+    "vendorId",
+    "businessName"
+  );
+  if (!mou) throw ApiError.notFound("MOU not found");
+  res.json({ success: true, data: mou });
+});

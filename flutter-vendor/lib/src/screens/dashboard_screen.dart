@@ -13,6 +13,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   Map<String, dynamic>? summary;
   Map<String, dynamic>? me;
+  bool loading = true;
 
   @override
   void initState() {
@@ -23,10 +24,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _load() async {
     try {
       final m = await ApiClient.instance.dio.get('/api/vendor/me');
-      setState(() => me = m.data['data']);
       final s = await ApiClient.instance.dio.get('/api/vendor/earnings/summary');
-      setState(() => summary = s.data['data']);
-    } catch (_) {}
+      setState(() {
+        me = m.data['data'];
+        summary = s.data['data'];
+        loading = false;
+      });
+    } catch (_) {
+      setState(() => loading = false);
+    }
+  }
+
+  Widget _tile(String label, num value) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: const TextStyle(color: Colors.grey)),
+            const SizedBox(height: 6),
+            Text('₹${value.toStringAsFixed(0)}',
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -42,49 +65,70 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          if (me != null)
-            Card(
-              child: ListTile(
-                title: Text(me!['businessName'] ?? ''),
-                subtitle: Text('Status: ${me!['status']}'),
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: loading
+            ? ListView(children: const [
+                SizedBox(height: 160),
+                Center(child: CircularProgressIndicator()),
+              ])
+            : ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  if (me != null)
+                    Card(
+                      child: ListTile(
+                        title: Text(me!['businessName'] ?? ''),
+                        subtitle: Text('Status: ${me!['status']}'),
+                      ),
+                    ),
+                  const SizedBox(height: 12),
+                  if (summary != null) ...[
+                    GridView.count(
+                      crossAxisCount: 2,
+                      shrinkWrap: true,
+                      mainAxisSpacing: 8,
+                      crossAxisSpacing: 8,
+                      physics: const NeverScrollableScrollPhysics(),
+                      childAspectRatio: 2.2,
+                      children: [
+                        _tile('Gross sales', (summary!['grossSales'] ?? 0) as num),
+                        _tile('Net earnings', (summary!['netEarnings'] ?? 0) as num),
+                        _tile('Pending payout',
+                            (summary!['pendingPayout'] ?? 0) as num),
+                        _tile('Paid out', (summary!['paidOut'] ?? 0) as num),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Shipping: ₹${summary!['totalShipping']}  ·  Admin commission: ₹${summary!['totalCommission']}',
+                      style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                  ],
+                  const SizedBox(height: 20),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      FilledButton.icon(
+                        onPressed: () => context.go('/products'),
+                        icon: const Icon(Icons.inventory),
+                        label: const Text('Products'),
+                      ),
+                      FilledButton.icon(
+                        onPressed: () => context.go('/orders'),
+                        icon: const Icon(Icons.shopping_bag),
+                        label: const Text('Orders'),
+                      ),
+                      FilledButton.icon(
+                        onPressed: () => context.go('/earnings'),
+                        icon: const Icon(Icons.account_balance_wallet),
+                        label: const Text('Earnings'),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ),
-          const SizedBox(height: 12),
-          if (summary != null)
-            for (final k in ['pending', 'processing', 'paid'])
-              Card(
-                child: ListTile(
-                  title: Text(k.toUpperCase()),
-                  subtitle: Text('${summary![k]['count']} orders · gross ₹${summary![k]['gross']}'),
-                  trailing: Text('₹${summary![k]['net']}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                ),
-              ),
-          const SizedBox(height: 20),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              FilledButton.icon(
-                onPressed: () => context.go('/products'),
-                icon: const Icon(Icons.inventory),
-                label: const Text('Products'),
-              ),
-              FilledButton.icon(
-                onPressed: () => context.go('/orders'),
-                icon: const Icon(Icons.shopping_bag),
-                label: const Text('Orders'),
-              ),
-              FilledButton.icon(
-                onPressed: () => context.go('/earnings'),
-                icon: const Icon(Icons.account_balance_wallet),
-                label: const Text('Earnings'),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }

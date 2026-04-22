@@ -34,6 +34,16 @@ export const createMouSchema = z.object({
   documentUrl: z.string().url().optional(),
 });
 
+export const updateMouSchema = z
+  .object({
+    adminCommissionPercent: z.number().min(0).max(100).optional(),
+    effectiveFrom: isoDateLike.optional(),
+    effectiveTo: isoDateLike.nullable().optional(),
+    terms: z.string().min(1).optional(),
+    documentUrl: z.string().url().optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, { message: "No fields to update" });
+
 export const updateUserStatusSchema = z.object({
   isActive: z.boolean(),
 });
@@ -46,6 +56,12 @@ export const generatePayoutSchema = z.object({
 
 export const markPayoutPaidSchema = z.object({
   utrNumber: z.string().min(1),
+});
+
+export const setReturnStatusSchema = z.object({
+  status: z.enum(["approved", "rejected", "picked_up", "received", "refunded"]),
+  vendorNote: z.string().optional(),
+  refundAmount: z.number().min(0).optional(),
 });
 
 export { isoDateLike };

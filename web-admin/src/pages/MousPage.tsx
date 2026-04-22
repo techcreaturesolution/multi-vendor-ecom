@@ -16,6 +16,14 @@ interface MOU {
   effectiveTo?: string;
   isActive: boolean;
   terms: string;
+  documentUrl?: string;
+}
+
+interface EditForm {
+  adminCommissionPercent: number;
+  effectiveFrom: string;
+  effectiveTo: string;
+  terms: string;
 }
 
 export default function MousPage() {
@@ -70,6 +78,42 @@ export default function MousPage() {
     if (!confirm("Deactivate this MOU?")) return;
     await api.post(`/api/admin/mous/${id}/deactivate`);
     load();
+  };
+
+  const [editing, setEditing] = useState<{ id: string; form: EditForm } | null>(null);
+
+  const openEdit = (m: MOU) => {
+    setEditing({
+      id: m._id,
+      form: {
+        adminCommissionPercent: m.adminCommissionPercent,
+        effectiveFrom: m.effectiveFrom.slice(0, 10),
+        effectiveTo: m.effectiveTo ? m.effectiveTo.slice(0, 10) : "",
+        terms: m.terms,
+      },
+    });
+  };
+
+  const saveEdit = async () => {
+    if (!editing) return;
+    try {
+      const body: Record<string, unknown> = {
+        adminCommissionPercent: Number(editing.form.adminCommissionPercent),
+        effectiveFrom: editing.form.effectiveFrom,
+        terms: editing.form.terms,
+      };
+      if (editing.form.effectiveTo) body.effectiveTo = editing.form.effectiveTo;
+      else body.effectiveTo = null;
+      await api.patch(`/api/admin/mous/${editing.id}`, body);
+      toast.success("MOU updated");
+      setEditing(null);
+      load();
+    } catch (err: unknown) {
+      toast.error(
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          "Failed"
+      );
+    }
   };
 
   return (
@@ -169,7 +213,13 @@ export default function MousPage() {
                     {m.isActive ? "active" : "inactive"}
                   </span>
                 </td>
-                <td className="p-3 text-right">
+                <td className="p-3 text-right space-x-3">
+                  <button
+                    onClick={() => openEdit(m)}
+                    className="text-xs text-primary-700 hover:underline"
+                  >
+                    Edit
+                  </button>
                   {m.isActive && (
                     <button
                       onClick={() => deactivate(m._id)}
@@ -191,6 +241,89 @@ export default function MousPage() {
           </tbody>
         </table>
       </div>
+
+      {editing && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg w-full max-w-lg p-6">
+            <h2 className="text-lg font-semibold mb-4">Edit MOU</h2>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="text-sm">
+                Commission %
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.1}
+                  className="mt-1 w-full rounded-md border-gray-300"
+                  value={editing.form.adminCommissionPercent}
+                  onChange={(e) =>
+                    setEditing({
+                      ...editing,
+                      form: { ...editing.form, adminCommissionPercent: Number(e.target.value) },
+                    })
+                  }
+                />
+              </label>
+              <label className="text-sm">
+                Effective From
+                <input
+                  type="date"
+                  className="mt-1 w-full rounded-md border-gray-300"
+                  value={editing.form.effectiveFrom}
+                  onChange={(e) =>
+                    setEditing({
+                      ...editing,
+                      form: { ...editing.form, effectiveFrom: e.target.value },
+                    })
+                  }
+                />
+              </label>
+              <label className="text-sm col-span-2">
+                Effective To (optional)
+                <input
+                  type="date"
+                  className="mt-1 w-full rounded-md border-gray-300"
+                  value={editing.form.effectiveTo}
+                  onChange={(e) =>
+                    setEditing({
+                      ...editing,
+                      form: { ...editing.form, effectiveTo: e.target.value },
+                    })
+                  }
+                />
+              </label>
+              <label className="text-sm col-span-2">
+                Terms
+                <textarea
+                  rows={4}
+                  className="mt-1 w-full rounded-md border-gray-300"
+                  value={editing.form.terms}
+                  onChange={(e) =>
+                    setEditing({
+                      ...editing,
+                      form: { ...editing.form, terms: e.target.value },
+                    })
+                  }
+                />
+              </label>
+            </div>
+            <div className="flex justify-end gap-2 mt-5">
+              <button
+                onClick={() => setEditing(null)}
+                className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveEdit}
+                className="px-4 py-2 text-sm bg-primary-600 text-white rounded-md"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

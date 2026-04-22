@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { api } from "../lib/api";
+import ImageUploader from "../components/ImageUploader";
 
 interface Product {
   _id: string;
@@ -12,12 +13,17 @@ interface Product {
   isActive: boolean;
   categoryId: string;
   description?: string;
+  images?: string[];
 }
 
 interface Category {
   _id: string;
   name: string;
 }
+
+const apiOrigin = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+const displayUrl = (u: string) =>
+  /^https?:\/\//.test(u) || !apiOrigin ? u : `${apiOrigin}${u}`;
 
 export default function ProductsPage() {
   const [items, setItems] = useState<Product[]>([]);
@@ -31,6 +37,7 @@ export default function ProductsPage() {
     price: 0,
     sku: "",
     stock: 0,
+    images: [] as string[],
   });
 
   const load = async () => {
@@ -56,6 +63,7 @@ export default function ProductsPage() {
         stock: Number(editing.stock),
         isActive: editing.isActive,
         description: editing.description,
+        images: editing.images ?? [],
       });
       toast.success("Saved");
       setEditing(null);
@@ -74,11 +82,19 @@ export default function ProductsPage() {
         ...form,
         price: Number(form.price),
         stock: Number(form.stock),
-        images: [],
       });
       toast.success("Created");
       setShowNew(false);
-      setForm({ name: "", slug: "", description: "", categoryId: "", price: 0, sku: "", stock: 0 });
+      setForm({
+        name: "",
+        slug: "",
+        description: "",
+        categoryId: "",
+        price: 0,
+        sku: "",
+        stock: 0,
+        images: [],
+      });
       load();
     } catch (err: unknown) {
       toast.error(
@@ -101,24 +117,74 @@ export default function ProductsPage() {
       </div>
 
       {showNew && (
-        <form onSubmit={create} className="bg-white rounded-lg p-5 shadow-sm mb-6 grid grid-cols-3 gap-3">
-          <input placeholder="Name" className="rounded-md border-gray-300"
-                 value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-          <input placeholder="slug" className="rounded-md border-gray-300"
-                 value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase() })} required />
-          <input placeholder="SKU" className="rounded-md border-gray-300"
-                 value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} required />
-          <select className="rounded-md border-gray-300"
-                  value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })} required>
+        <form
+          onSubmit={create}
+          className="bg-white rounded-lg p-5 shadow-sm mb-6 grid grid-cols-3 gap-3"
+        >
+          <input
+            placeholder="Name"
+            className="rounded-md border-gray-300"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            required
+          />
+          <input
+            placeholder="slug"
+            className="rounded-md border-gray-300"
+            value={form.slug}
+            onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase() })}
+            required
+          />
+          <input
+            placeholder="SKU"
+            className="rounded-md border-gray-300"
+            value={form.sku}
+            onChange={(e) => setForm({ ...form, sku: e.target.value })}
+            required
+          />
+          <select
+            className="rounded-md border-gray-300"
+            value={form.categoryId}
+            onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
+            required
+          >
             <option value="">Category...</option>
-            {cats.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
+            {cats.map((c) => (
+              <option key={c._id} value={c._id}>
+                {c.name}
+              </option>
+            ))}
           </select>
-          <input type="number" placeholder="Price" className="rounded-md border-gray-300"
-                 value={form.price} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} required />
-          <input type="number" placeholder="Stock" className="rounded-md border-gray-300"
-                 value={form.stock} onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })} required />
-          <textarea placeholder="Description" className="col-span-3 rounded-md border-gray-300"
-                    value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} required />
+          <input
+            type="number"
+            placeholder="Price"
+            className="rounded-md border-gray-300"
+            value={form.price}
+            onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
+            required
+          />
+          <input
+            type="number"
+            placeholder="Stock"
+            className="rounded-md border-gray-300"
+            value={form.stock}
+            onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })}
+            required
+          />
+          <textarea
+            placeholder="Description"
+            className="col-span-3 rounded-md border-gray-300"
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+            required
+          />
+          <div className="col-span-3">
+            <div className="text-sm text-gray-700 mb-1">Images</div>
+            <ImageUploader
+              value={form.images}
+              onChange={(urls) => setForm({ ...form, images: urls })}
+            />
+          </div>
           <button className="col-span-3 bg-primary-600 text-white rounded-md py-2">Create</button>
         </form>
       )}
@@ -127,7 +193,7 @@ export default function ProductsPage() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-left">
             <tr>
-              <th className="p-3">Name</th>
+              <th className="p-3">Product</th>
               <th className="p-3">SKU</th>
               <th className="p-3">Price</th>
               <th className="p-3">Stock</th>
@@ -138,28 +204,58 @@ export default function ProductsPage() {
           <tbody className="divide-y">
             {items.map((p) => (
               <tr key={p._id}>
-                <td className="p-3 font-medium">{p.name}</td>
+                <td className="p-3 font-medium">
+                  <div className="flex items-center gap-3">
+                    {p.images && p.images[0] ? (
+                      <img
+                        src={displayUrl(p.images[0])}
+                        alt=""
+                        className="h-10 w-10 rounded object-cover border"
+                      />
+                    ) : (
+                      <div className="h-10 w-10 rounded bg-gray-100 border" />
+                    )}
+                    <span>{p.name}</span>
+                  </div>
+                </td>
                 <td className="p-3 text-gray-600">{p.sku}</td>
                 <td className="p-3">₹{p.price.toLocaleString("en-IN")}</td>
                 <td className="p-3">{p.stock}</td>
                 <td className="p-3">
-                  <span className={`text-xs px-2 py-1 rounded ${p.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-700"}`}>
+                  <span
+                    className={`text-xs px-2 py-1 rounded ${
+                      p.isActive
+                        ? "bg-green-100 text-green-800"
+                        : "bg-gray-100 text-gray-700"
+                    }`}
+                  >
                     {p.isActive ? "active" : "inactive"}
                   </span>
                 </td>
                 <td className="p-3 text-right">
-                  <button onClick={() => setEditing(p)} className="text-xs text-primary-700 hover:underline">Edit</button>
+                  <button
+                    onClick={() => setEditing(p)}
+                    className="text-xs text-primary-700 hover:underline"
+                  >
+                    Edit
+                  </button>
                 </td>
               </tr>
             ))}
-            {!items.length && <tr><td colSpan={6} className="p-8 text-center text-gray-500">No products yet</td></tr>}
+            {!items.length && (
+              <tr>
+                <td colSpan={6} className="p-8 text-center text-gray-500">
+                  No products yet
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
 
       {editing && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg w-full max-w-lg p-6">
+          <div className="bg-white rounded-lg w-full max-w-lg p-6 max-h-[90vh] overflow-auto">
             <h2 className="text-lg font-semibold mb-4">Edit {editing.name}</h2>
             <div className="grid grid-cols-2 gap-3">
               <label className="text-sm col-span-2">
@@ -176,7 +272,9 @@ export default function ProductsPage() {
                   type="number"
                   className="mt-1 w-full rounded-md border-gray-300"
                   value={editing.price}
-                  onChange={(e) => setEditing({ ...editing, price: Number(e.target.value) })}
+                  onChange={(e) =>
+                    setEditing({ ...editing, price: Number(e.target.value) })
+                  }
                 />
               </label>
               <label className="text-sm">
@@ -185,7 +283,9 @@ export default function ProductsPage() {
                   type="number"
                   className="mt-1 w-full rounded-md border-gray-300"
                   value={editing.stock}
-                  onChange={(e) => setEditing({ ...editing, stock: Number(e.target.value) })}
+                  onChange={(e) =>
+                    setEditing({ ...editing, stock: Number(e.target.value) })
+                  }
                 />
               </label>
               <label className="text-sm col-span-2">
@@ -194,14 +294,25 @@ export default function ProductsPage() {
                   rows={3}
                   className="mt-1 w-full rounded-md border-gray-300"
                   value={editing.description || ""}
-                  onChange={(e) => setEditing({ ...editing, description: e.target.value })}
+                  onChange={(e) =>
+                    setEditing({ ...editing, description: e.target.value })
+                  }
                 />
               </label>
+              <div className="col-span-2 text-sm">
+                <div className="mb-1">Images</div>
+                <ImageUploader
+                  value={editing.images ?? []}
+                  onChange={(urls) => setEditing({ ...editing, images: urls })}
+                />
+              </div>
               <label className="text-sm col-span-2 flex items-center gap-2">
                 <input
                   type="checkbox"
                   checked={editing.isActive}
-                  onChange={(e) => setEditing({ ...editing, isActive: e.target.checked })}
+                  onChange={(e) =>
+                    setEditing({ ...editing, isActive: e.target.checked })
+                  }
                 />
                 Active (visible on storefront)
               </label>

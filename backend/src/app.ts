@@ -3,6 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import rateLimit from "express-rate-limit";
+import path from "path";
 import { env } from "./config/env";
 import { errorHandler, notFoundHandler } from "./middleware/error";
 
@@ -11,12 +12,20 @@ import adminRoutes from "./routes/admin";
 import vendorRoutes from "./routes/vendor";
 import customerRoutes from "./routes/customer";
 import webhookRoutes from "./routes/webhooks";
+import uploadsRoutes from "./routes/uploads.routes";
 
 export function createApp() {
   const app = express();
 
-  app.use(helmet());
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: "cross-origin" },
+    })
+  );
   app.use(cors({ origin: true, credentials: true }));
+
+  // Serve uploaded files publicly so /uploads/<filename> works from any frontend.
+  app.use("/uploads", express.static(path.resolve(env.upload.dir)));
   app.use(
     morgan(env.nodeEnv === "production" ? "combined" : "dev", {
       skip: (_req, res) => env.nodeEnv === "test" && res.statusCode < 400,
@@ -51,6 +60,7 @@ export function createApp() {
   app.use("/api/vendor", vendorRoutes);
   app.use("/api/customer", customerRoutes);
   app.use("/api/webhooks", webhookRoutes);
+  app.use("/api/uploads", uploadsRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

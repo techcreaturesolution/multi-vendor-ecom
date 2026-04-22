@@ -8,6 +8,7 @@ import VendorsPage from "./pages/VendorsPage";
 import MousPage from "./pages/MousPage";
 import CustomersPage from "./pages/CustomersPage";
 import PayoutsPage from "./pages/PayoutsPage";
+import ReturnsPage from "./pages/ReturnsPage";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const user = useAuthStore((s) => s.user);
@@ -33,6 +34,7 @@ export default function App() {
         <Route path="mous" element={<MousPage />} />
         <Route path="customers" element={<CustomersPage />} />
         <Route path="payouts" element={<PayoutsPage />} />
+        <Route path="returns" element={<ReturnsPage />} />
       </Route>
     </Routes>
   );
