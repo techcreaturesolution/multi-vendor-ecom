@@ -40,6 +40,25 @@ export function verifyRazorpaySignature(params: {
   return expected === params.signature;
 }
 
+/**
+ * Issue a refund for a captured Razorpay payment. Amount is in INR; we convert
+ * to paise before calling the SDK. If amount is omitted, Razorpay refunds the
+ * full captured amount.
+ */
+export async function refundRazorpayPayment(params: {
+  paymentId: string;
+  amount?: number; // in INR
+  notes?: Record<string, string>;
+  speed?: "normal" | "optimum";
+}) {
+  const body: Record<string, unknown> = {
+    speed: params.speed || "normal",
+  };
+  if (params.amount != null) body.amount = Math.round(params.amount * 100);
+  if (params.notes) body.notes = params.notes;
+  return razorpayClient().payments.refund(params.paymentId, body);
+}
+
 export function verifyWebhookSignature(body: string, signature: string): boolean {
   if (!env.razorpay.webhookSecret) return false;
   const expected = crypto

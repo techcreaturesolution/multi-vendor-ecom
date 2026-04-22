@@ -29,6 +29,22 @@ export const createProductSchema = z.object({
     })
     .optional(),
   tags: z.array(z.string()).optional(),
+  variants: z
+    .array(
+      z.object({
+        sku: z.string().min(1),
+        attributes: z.record(z.string(), z.string()).default({}),
+        price: z.number().min(0),
+        stock: z.number().int().min(0),
+        image: z
+          .string()
+          .refine((v) => /^https?:\/\//.test(v) || v.startsWith("/uploads/"), {
+            message: "Image must be an absolute URL or /uploads/... path",
+          })
+          .optional(),
+      })
+    )
+    .optional(),
   isActive: z.boolean().optional(),
 });
 

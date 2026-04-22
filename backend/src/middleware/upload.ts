@@ -45,6 +45,23 @@ export const uploadImage = multer({
 });
 
 /**
+ * In-memory upload for small structured files (e.g. bulk product CSV). We
+ * keep the buffer in RAM so nothing persists on disk and we can reject
+ * anything that isn't `.csv` before parsing.
+ */
+export const uploadCsv = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (ext !== ".csv") {
+      return cb(new ApiError(400, "Only .csv files are accepted"));
+    }
+    cb(null, true);
+  },
+});
+
+/**
  * Build the public URL for an uploaded file. The app serves files from
  * `/uploads/<filename>`. Returning a relative URL keeps things simple for
  * local dev; in production a CDN URL should be constructed here.

@@ -2,10 +2,12 @@ import { Router } from "express";
 import { authenticate, requireRole } from "../../middleware/auth";
 import { validate } from "../../middleware/validate";
 import * as products from "../../controllers/vendor/products.controller";
+import * as bulk from "../../controllers/vendor/bulk.controller";
 import * as orders from "../../controllers/vendor/orders.controller";
 import * as customers from "../../controllers/vendor/customers.controller";
 import * as earnings from "../../controllers/vendor/earnings.controller";
 import * as profile from "../../controllers/vendor/profile.controller";
+import { uploadCsv } from "../../middleware/upload";
 import {
   createProductSchema,
   updateProductSchema,
@@ -28,6 +30,7 @@ router.get("/products/:id", products.getOne);
 router.post("/products", validate(createProductSchema), products.create);
 router.patch("/products/:id", validate(updateProductSchema), products.update);
 router.delete("/products/:id", products.remove);
+router.post("/products/bulk", uploadCsv.single("file"), bulk.bulkUpload);
 
 // Orders
 router.get("/orders", orders.list);

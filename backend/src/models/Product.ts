@@ -1,5 +1,13 @@
 import mongoose, { Schema, Document, Types } from "mongoose";
 
+export interface IProductVariant {
+  sku: string;
+  attributes: Record<string, string>;
+  price: number;
+  stock: number;
+  image?: string;
+}
+
 export interface IProduct extends Document {
   vendorId: Types.ObjectId;
   categoryId: Types.ObjectId;
@@ -16,6 +24,7 @@ export interface IProduct extends Document {
   weight?: number;
   dimensions?: { length: number; width: number; height: number };
   tags: string[];
+  variants: IProductVariant[];
   isActive: boolean;
   isFeatured: boolean;
   averageRating: number;
@@ -45,6 +54,21 @@ const productSchema = new Schema<IProduct>(
       height: { type: Number },
     },
     tags: [{ type: String }],
+    variants: {
+      type: [
+        new Schema<IProductVariant>(
+          {
+            sku: { type: String, required: true },
+            attributes: { type: Schema.Types.Mixed, default: {} },
+            price: { type: Number, required: true, min: 0 },
+            stock: { type: Number, required: true, default: 0, min: 0 },
+            image: { type: String },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
     isActive: { type: Boolean, default: true },
     isFeatured: { type: Boolean, default: false },
     averageRating: { type: Number, default: 0 },

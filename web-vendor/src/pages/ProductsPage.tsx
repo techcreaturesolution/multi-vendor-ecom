@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { api } from "../lib/api";
 import ImageUploader from "../components/ImageUploader";
+import VariantEditor, { Variant } from "../components/VariantEditor";
+import BulkUploadDialog from "../components/BulkUploadDialog";
 
 interface Product {
   _id: string;
@@ -14,6 +16,7 @@ interface Product {
   categoryId: string;
   description?: string;
   images?: string[];
+  variants?: Variant[];
 }
 
 interface Category {
@@ -29,6 +32,7 @@ export default function ProductsPage() {
   const [items, setItems] = useState<Product[]>([]);
   const [cats, setCats] = useState<Category[]>([]);
   const [showNew, setShowNew] = useState(false);
+  const [showBulk, setShowBulk] = useState(false);
   const [form, setForm] = useState({
     name: "",
     slug: "",
@@ -38,6 +42,7 @@ export default function ProductsPage() {
     sku: "",
     stock: 0,
     images: [] as string[],
+    variants: [] as Variant[],
   });
 
   const load = async () => {
@@ -64,6 +69,7 @@ export default function ProductsPage() {
         isActive: editing.isActive,
         description: editing.description,
         images: editing.images ?? [],
+        variants: editing.variants ?? [],
       });
       toast.success("Saved");
       setEditing(null);
@@ -94,6 +100,7 @@ export default function ProductsPage() {
         sku: "",
         stock: 0,
         images: [],
+        variants: [],
       });
       load();
     } catch (err: unknown) {
@@ -108,13 +115,27 @@ export default function ProductsPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Products</h1>
-        <button
-          onClick={() => setShowNew(!showNew)}
-          className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-md text-sm"
-        >
-          {showNew ? "Cancel" : "+ New product"}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowBulk(true)}
+            className="border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-md text-sm"
+          >
+            Bulk upload
+          </button>
+          <button
+            onClick={() => setShowNew(!showNew)}
+            className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-md text-sm"
+          >
+            {showNew ? "Cancel" : "+ New product"}
+          </button>
+        </div>
       </div>
+
+      <BulkUploadDialog
+        open={showBulk}
+        onClose={() => setShowBulk(false)}
+        onDone={load}
+      />
 
       {showNew && (
         <form
@@ -183,6 +204,13 @@ export default function ProductsPage() {
             <ImageUploader
               value={form.images}
               onChange={(urls) => setForm({ ...form, images: urls })}
+            />
+          </div>
+          <div className="col-span-3">
+            <div className="text-sm text-gray-700 mb-1">Variants (optional)</div>
+            <VariantEditor
+              value={form.variants}
+              onChange={(v) => setForm({ ...form, variants: v })}
             />
           </div>
           <button className="col-span-3 bg-primary-600 text-white rounded-md py-2">Create</button>
@@ -304,6 +332,13 @@ export default function ProductsPage() {
                 <ImageUploader
                   value={editing.images ?? []}
                   onChange={(urls) => setEditing({ ...editing, images: urls })}
+                />
+              </div>
+              <div className="col-span-2 text-sm">
+                <div className="mb-1">Variants</div>
+                <VariantEditor
+                  value={editing.variants ?? []}
+                  onChange={(v) => setEditing({ ...editing, variants: v })}
                 />
               </div>
               <label className="text-sm col-span-2 flex items-center gap-2">
