@@ -50,12 +50,19 @@ export const razorpayWebhook = asyncHandler(async (req: Request, res: Response) 
     );
   } else if (event === "refund.processed") {
     const r = payload.refund.entity;
+    // Use $inc so that multiple partial refunds on the same payment
+    // accumulate correctly rather than clobbering each other. The
+    // accompanying ReturnRequest-side bookkeeping in attemptRefund also
+    // accumulates, so the total reported on Payment stays consistent with
+    // the sum of actual gateway refunds.
     await Payment.findOneAndUpdate(
       { gatewayPaymentId: r.payment_id },
       {
-        status: "refunded",
-        refundedAt: new Date(),
-        refundAmount: r.amount / 100,
+        $set: {
+          status: "refunded",
+          refundedAt: new Date(),
+        },
+        $inc: { refundAmount: r.amount / 100 },
       }
     );
   }

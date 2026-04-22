@@ -22,7 +22,7 @@ interface ReturnRequest {
   refundAmount?: number;
   vendorNote?: string;
   gatewayRefundId?: string;
-  refundStatus?: "pending" | "processed" | "failed";
+  refundStatus?: "pending" | "processing" | "processed" | "failed";
   refundError?: string;
   createdAt: string;
 }
@@ -64,7 +64,10 @@ export default function ReturnsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
 
+  const [retrying, setRetrying] = useState<string | null>(null);
   const retry = async (rr: ReturnRequest) => {
+    if (retrying) return;
+    setRetrying(rr._id);
     try {
       await api.post(`/api/admin/returns/${rr._id}/refund`);
       toast.success("Refund re-attempted");
@@ -74,6 +77,8 @@ export default function ReturnsPage() {
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
           "Refund failed"
       );
+    } finally {
+      setRetrying(null);
     }
   };
 
@@ -214,14 +219,23 @@ export default function ReturnsPage() {
                     <div className="text-red-700 text-xs">Error: {rr.refundError}</div>
                   )}
                   {rr.vendorNote && <div>Note: {rr.vendorNote}</div>}
-                  {rr.status === "refunded" && rr.refundStatus !== "processed" && (
-                    <button
-                      onClick={() => retry(rr)}
-                      className="mt-1 text-xs px-3 py-1.5 rounded-md border border-primary-300 text-primary-700 hover:bg-primary-50"
-                    >
-                      Retry Razorpay refund
-                    </button>
-                  )}
+                  {rr.status === "refunded" &&
+                    rr.refundStatus !== "processed" &&
+                    !rr.gatewayRefundId && (
+                      <button
+                        onClick={() => retry(rr)}
+                        disabled={
+                          retrying === rr._id ||
+                          rr.refundStatus === "processing"
+                        }
+                        className="mt-1 text-xs px-3 py-1.5 rounded-md border border-primary-300 text-primary-700 hover:bg-primary-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {retrying === rr._id ||
+                        rr.refundStatus === "processing"
+                          ? "Retrying…"
+                          : "Retry Razorpay refund"}
+                      </button>
+                    )}
                 </div>
               )}
 

@@ -78,22 +78,40 @@ export const setStatus = asyncHandler(async (req: Request, res: Response) => {
  * Retry the Razorpay refund for a return request that's already in `refunded`
  * state but for which the gateway call previously failed (or was never made
  * because Razorpay was not configured at the time).
+ *
+ * The claim step uses a single atomic findOneAndUpdate: it will only succeed
+ * if the document still has no gatewayRefundId and is not currently marked
+ * "processing". This closes the TOCTOU race that a double-click of the retry
+ * button would otherwise open.
  */
 export const retryRefund = asyncHandler(async (req: Request, res: Response) => {
-  const rr = await ReturnRequest.findById(req.params.id);
-  if (!rr) throw ApiError.notFound("Return request not found");
-  if (rr.status !== "refunded") {
-    throw ApiError.badRequest("Return must be in refunded state before refunding");
+  const rr = await ReturnRequest.findOneAndUpdate(
+    {
+      _id: req.params.id,
+      status: "refunded",
+      gatewayRefundId: { $in: [null, undefined, ""] },
+      refundStatus: { $ne: "processing" },
+    },
+    { $set: { refundStatus: "processing", refundError: undefined } },
+    { new: true }
+  );
+  if (!rr) {
+    // Disambiguate why the claim failed so the admin gets a useful message.
+    const existing = await ReturnRequest.findById(req.params.id);
+    if (!existing) throw ApiError.notFound("Return request not found");
+    if (existing.status !== "refunded") {
+      throw ApiError.badRequest(
+        "Return must be in refunded state before refunding"
+      );
+    }
+    if (existing.gatewayRefundId) {
+      throw ApiError.badRequest(
+        `Refund already issued at the gateway (${existing.gatewayRefundId})`
+      );
+    }
+    throw ApiError.badRequest("A refund attempt is already in progress");
   }
-  // The gateway call itself is the source of truth for idempotency. Even if
-  // a bookkeeping save failed after a successful refund (leaving us with
-  // gatewayRefundId set but refundStatus !== "processed"), we must not issue
-  // a second refund to Razorpay. Block on gatewayRefundId alone.
-  if (rr.gatewayRefundId) {
-    throw ApiError.badRequest(
-      `Refund already issued at the gateway (${rr.gatewayRefundId})`
-    );
-  }
+
   await attemptRefund(rr);
   await rr.save();
   res.json({ success: true, data: rr });
@@ -129,8 +147,10 @@ async function attemptRefund(rr: InstanceType<typeof ReturnRequest>): Promise<vo
 
     payment.status = "refunded";
     payment.refundedAt = new Date();
-    payment.refundAmount =
-      (payment.refundAmount || 0) + (rr.refundAmount ?? payment.amount);
+    // Don't update payment.refundAmount here — the refund.processed webhook
+    // is the single source of truth for the accumulated refunded total (it
+    // uses $inc to accumulate across partial refunds). Updating here as well
+    // would double-count once the webhook arrives.
     await payment.save();
 
     if (order) {

@@ -14,7 +14,7 @@ export interface IReturnRequest extends Document {
   vendorNote?: string;
   resolvedAt?: Date;
   gatewayRefundId?: string;
-  refundStatus?: "pending" | "processed" | "failed";
+  refundStatus?: "pending" | "processing" | "processed" | "failed";
   refundError?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -41,7 +41,10 @@ const returnRequestSchema = new Schema<IReturnRequest>(
     vendorNote: { type: String },
     resolvedAt: { type: Date },
     gatewayRefundId: { type: String },
-    refundStatus: { type: String, enum: ["pending", "processed", "failed"] },
+    refundStatus: {
+      type: String,
+      enum: ["pending", "processing", "processed", "failed"],
+    },
     refundError: { type: String },
   },
   { timestamps: true }
