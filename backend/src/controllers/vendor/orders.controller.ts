@@ -134,9 +134,25 @@ export const ship = asyncHandler(async (req: Request, res: Response) => {
   order.status = "shipped";
   await order.save();
 
-  // Decrement stock
-  for (const item of order.items.filter((i) => String(i.vendorId) === String(vendor._id))) {
-    await Product.updateOne({ _id: item.productId }, { $inc: { stock: -item.quantity } });
+  // Decrement stock. For variant line items we decrement the matching
+  // variant's stock via arrayFilters; otherwise we decrement product-level
+  // stock. (Both stocks are independent — the base product stock is only
+  // meaningful for products that don't use variants.)
+  for (const item of order.items.filter(
+    (i) => String(i.vendorId) === String(vendor._id)
+  )) {
+    if (item.variantSku) {
+      await Product.updateOne(
+        { _id: item.productId },
+        { $inc: { "variants.$[elem].stock": -item.quantity } },
+        { arrayFilters: [{ "elem.sku": item.variantSku }] }
+      );
+    } else {
+      await Product.updateOne(
+        { _id: item.productId },
+        { $inc: { stock: -item.quantity } }
+      );
+    }
   }
 
   res.json({ success: true, data: { order, shipment } });

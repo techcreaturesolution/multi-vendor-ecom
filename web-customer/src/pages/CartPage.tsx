@@ -4,6 +4,13 @@ import toast from "react-hot-toast";
 import { api } from "../lib/api";
 import { useAuthStore } from "../store/auth";
 
+interface Variant {
+  sku: string;
+  attributes: Record<string, string>;
+  price: number;
+  stock: number;
+}
+
 interface CartItem {
   productId: {
     _id: string;
@@ -12,8 +19,11 @@ interface CartItem {
     price: number;
     images: string[];
     stock: number;
+    variants?: Variant[];
   };
+  variantSku?: string;
   quantity: number;
+  priceAtAdd: number;
 }
 
 interface Cart {
@@ -43,16 +53,39 @@ export default function CartPage() {
       </div>
     );
 
-  const update = async (pid: string, qty: number) => {
-    await api.patch(`/api/customer/cart/items/${pid}`, { quantity: qty });
+  const update = async (pid: string, qty: number, variantSku?: string) => {
+    await api.patch(`/api/customer/cart/items/${pid}`, {
+      quantity: qty,
+      variantSku,
+    });
     load();
   };
-  const remove = async (pid: string) => {
-    await api.delete(`/api/customer/cart/items/${pid}`);
+  const remove = async (pid: string, variantSku?: string) => {
+    const qs = variantSku ? `?variantSku=${encodeURIComponent(variantSku)}` : "";
+    await api.delete(`/api/customer/cart/items/${pid}${qs}`);
     load();
   };
 
-  const subtotal = cart?.items.reduce((s, i) => s + i.productId.price * i.quantity, 0) || 0;
+  const lineStock = (i: CartItem): number => {
+    if (i.variantSku) {
+      return (
+        i.productId.variants?.find((v) => v.sku === i.variantSku)?.stock ?? 0
+      );
+    }
+    return i.productId.stock;
+  };
+  const lineAttrs = (i: CartItem): string | null => {
+    if (!i.variantSku) return null;
+    const v = i.productId.variants?.find((x) => x.sku === i.variantSku);
+    if (!v) return i.variantSku;
+    const s = Object.entries(v.attributes || {})
+      .map(([k, val]) => `${k}: ${val}`)
+      .join(", ");
+    return s || i.variantSku;
+  };
+
+  const subtotal =
+    cart?.items.reduce((s, i) => s + i.priceAtAdd * i.quantity, 0) || 0;
 
   if (!cart) return <div className="p-8 text-center">Loading...</div>;
 
@@ -68,40 +101,49 @@ export default function CartPage() {
     <div className="max-w-4xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-6">Cart</h1>
       <div className="space-y-3">
-        {cart.items.map((i) => (
-          <div key={i.productId._id} className="flex items-center gap-4 bg-white border rounded-lg p-4">
-            <div className="w-16 h-16 bg-gray-100 rounded overflow-hidden shrink-0">
-              {i.productId.images?.[0] && (
-                <img src={i.productId.images[0]} className="w-full h-full object-cover" alt="" />
-              )}
-            </div>
-            <div className="flex-1">
-              <Link to={`/p/${i.productId.slug}`} className="font-medium hover:underline">
-                {i.productId.name}
-              </Link>
-              <div className="text-sm text-gray-500">
-                ₹{i.productId.price.toLocaleString("en-IN")} each
+        {cart.items.map((i) => {
+          const attrs = lineAttrs(i);
+          const key = `${i.productId._id}:${i.variantSku ?? ""}`;
+          return (
+            <div key={key} className="flex items-center gap-4 bg-white border rounded-lg p-4">
+              <div className="w-16 h-16 bg-gray-100 rounded overflow-hidden shrink-0">
+                {i.productId.images?.[0] && (
+                  <img src={i.productId.images[0]} className="w-full h-full object-cover" alt="" />
+                )}
               </div>
+              <div className="flex-1">
+                <Link to={`/p/${i.productId.slug}`} className="font-medium hover:underline">
+                  {i.productId.name}
+                </Link>
+                {attrs && (
+                  <div className="text-xs text-gray-600">{attrs}</div>
+                )}
+                <div className="text-sm text-gray-500">
+                  ₹{i.priceAtAdd.toLocaleString("en-IN")} each
+                </div>
+              </div>
+              <input
+                type="number"
+                min={0}
+                max={lineStock(i)}
+                value={i.quantity}
+                onChange={(e) =>
+                  update(i.productId._id, Number(e.target.value), i.variantSku)
+                }
+                className="w-20 rounded-md border-gray-300"
+              />
+              <div className="w-24 text-right font-semibold">
+                ₹{(i.priceAtAdd * i.quantity).toLocaleString("en-IN")}
+              </div>
+              <button
+                onClick={() => remove(i.productId._id, i.variantSku)}
+                className="text-red-600 hover:underline text-sm"
+              >
+                Remove
+              </button>
             </div>
-            <input
-              type="number"
-              min={0}
-              max={i.productId.stock}
-              value={i.quantity}
-              onChange={(e) => update(i.productId._id, Number(e.target.value))}
-              className="w-20 rounded-md border-gray-300"
-            />
-            <div className="w-24 text-right font-semibold">
-              ₹{(i.productId.price * i.quantity).toLocaleString("en-IN")}
-            </div>
-            <button
-              onClick={() => remove(i.productId._id)}
-              className="text-red-600 hover:underline text-sm"
-            >
-              Remove
-            </button>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="mt-6 flex items-center justify-between bg-white border rounded-lg p-5">

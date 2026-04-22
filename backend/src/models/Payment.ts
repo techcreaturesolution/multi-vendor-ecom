@@ -15,6 +15,7 @@ export interface IPayment extends Document {
   capturedAt?: Date;
   refundedAt?: Date;
   refundAmount?: number;
+  processedRefundIds?: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -39,6 +40,9 @@ const paymentSchema = new Schema<IPayment>(
     capturedAt: { type: Date },
     refundedAt: { type: Date },
     refundAmount: { type: Number },
+    // Gateway refund IDs we've already applied to refundAmount — lets us
+    // safely $inc on webhook retries without double-counting.
+    processedRefundIds: { type: [String], default: [] },
   },
   { timestamps: true }
 );

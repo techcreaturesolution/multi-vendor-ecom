@@ -50,12 +50,24 @@ export const razorpayWebhook = asyncHandler(async (req: Request, res: Response) 
     );
   } else if (event === "refund.processed") {
     const r = payload.refund.entity;
+    // Idempotent accumulation. We $inc refundAmount so multiple partial
+    // refunds on the same payment add up correctly, but gate the update on
+    // `r.id` not yet being in processedRefundIds so Razorpay's own webhook
+    // retries (same refund id, fires again on 5xx/timeout) don't double-
+    // count. $addToSet records the refund id only when the $inc actually
+    // runs, so the guard stays consistent.
     await Payment.findOneAndUpdate(
-      { gatewayPaymentId: r.payment_id },
       {
-        status: "refunded",
-        refundedAt: new Date(),
-        refundAmount: r.amount / 100,
+        gatewayPaymentId: r.payment_id,
+        processedRefundIds: { $ne: r.id },
+      },
+      {
+        $set: {
+          status: "refunded",
+          refundedAt: new Date(),
+        },
+        $inc: { refundAmount: r.amount / 100 },
+        $addToSet: { processedRefundIds: r.id },
       }
     );
   }

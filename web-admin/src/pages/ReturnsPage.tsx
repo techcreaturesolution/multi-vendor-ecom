@@ -21,6 +21,9 @@ interface ReturnRequest {
     | string;
   refundAmount?: number;
   vendorNote?: string;
+  gatewayRefundId?: string;
+  refundStatus?: "pending" | "processing" | "processed" | "failed";
+  refundError?: string;
   createdAt: string;
 }
 
@@ -60,6 +63,24 @@ export default function ReturnsPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
+
+  const [retrying, setRetrying] = useState<string | null>(null);
+  const retry = async (rr: ReturnRequest) => {
+    if (retrying) return;
+    setRetrying(rr._id);
+    try {
+      await api.post(`/api/admin/returns/${rr._id}/refund`);
+      toast.success("Refund re-attempted");
+      load();
+    } catch (err: unknown) {
+      toast.error(
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          "Refund failed"
+      );
+    } finally {
+      setRetrying(null);
+    }
+  };
 
   const transition = async (rr: ReturnRequest, next: ReturnStatus) => {
     const body: Record<string, unknown> = { status: next };
@@ -162,15 +183,59 @@ export default function ReturnsPage() {
                 ))}
               </ul>
 
-              {(rr.refundAmount != null || rr.vendorNote) && (
-                <div className="mt-3 text-sm text-gray-700 bg-gray-50 rounded-md p-2">
+              {(rr.refundAmount != null ||
+                rr.vendorNote ||
+                rr.gatewayRefundId ||
+                rr.refundStatus) && (
+                <div className="mt-3 text-sm text-gray-700 bg-gray-50 rounded-md p-2 space-y-1">
                   {rr.refundAmount != null && (
                     <div>
                       Refund recorded:{" "}
                       <b>₹{rr.refundAmount.toLocaleString("en-IN")}</b>
                     </div>
                   )}
+                  {rr.refundStatus && (
+                    <div>
+                      Gateway:{" "}
+                      <span
+                        className={
+                          rr.refundStatus === "processed"
+                            ? "text-green-700"
+                            : rr.refundStatus === "failed"
+                            ? "text-red-700"
+                            : "text-amber-700"
+                        }
+                      >
+                        {rr.refundStatus}
+                      </span>
+                      {rr.gatewayRefundId && (
+                        <span className="ml-2 font-mono text-xs text-gray-500">
+                          {rr.gatewayRefundId}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {rr.refundError && (
+                    <div className="text-red-700 text-xs">Error: {rr.refundError}</div>
+                  )}
                   {rr.vendorNote && <div>Note: {rr.vendorNote}</div>}
+                  {rr.status === "refunded" &&
+                    rr.refundStatus !== "processed" &&
+                    !rr.gatewayRefundId && (
+                      <button
+                        onClick={() => retry(rr)}
+                        disabled={
+                          retrying === rr._id ||
+                          rr.refundStatus === "processing"
+                        }
+                        className="mt-1 text-xs px-3 py-1.5 rounded-md border border-primary-300 text-primary-700 hover:bg-primary-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {retrying === rr._id ||
+                        rr.refundStatus === "processing"
+                          ? "Retrying…"
+                          : "Retry Razorpay refund"}
+                      </button>
+                    )}
                 </div>
               )}
 

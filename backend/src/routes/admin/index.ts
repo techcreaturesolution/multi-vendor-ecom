@@ -62,5 +62,6 @@ router.post("/payouts/:id/mark-paid", validate(markPayoutPaidSchema), payouts.ma
 router.get("/returns", returns.list);
 router.get("/returns/:id", returns.getOne);
 router.patch("/returns/:id/status", validate(setReturnStatusSchema), returns.setStatus);
+router.post("/returns/:id/refund", returns.retryRefund);
 
 export default router;
