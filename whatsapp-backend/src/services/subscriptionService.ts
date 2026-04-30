@@ -72,7 +72,6 @@ export async function confirmPayment(tenantId: string, data: {
   razorpayOrderId: string;
   razorpayPaymentId: string;
   razorpaySignature: string;
-  plan: PlanType;
 }) {
   const crypto = await import("crypto");
   const generatedSignature = crypto
@@ -84,11 +83,25 @@ export async function confirmPayment(tenantId: string, data: {
     throw new AppError("Invalid payment signature", 400);
   }
 
-  const planConfig = PLAN_CONFIG[data.plan];
+  const rz = getRazorpay();
+  const order = await rz.orders.fetch(data.razorpayOrderId);
+  const notes = order.notes as Record<string, string> | undefined;
+  const plan = notes?.plan as PlanType | undefined;
+
+  if (!plan || !PLAN_CONFIG[plan]) {
+    throw new AppError("Invalid plan in order", 400);
+  }
+
+  const planConfig = PLAN_CONFIG[plan];
+
+  if (order.amount !== planConfig.priceMonthly * 100) {
+    throw new AppError("Order amount does not match plan price", 400);
+  }
+
   const subscription = await Subscription.findOneAndUpdate(
     { tenantId },
     {
-      plan: data.plan,
+      plan,
       status: "active",
       messageQuota: planConfig.messageQuota,
       priceMonthly: planConfig.priceMonthly,
@@ -100,7 +113,7 @@ export async function confirmPayment(tenantId: string, data: {
   );
 
   await Tenant.findByIdAndUpdate(tenantId, {
-    plan: data.plan,
+    plan,
     messageQuota: planConfig.messageQuota,
   });
 

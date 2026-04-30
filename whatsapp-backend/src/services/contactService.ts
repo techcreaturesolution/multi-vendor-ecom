@@ -109,10 +109,11 @@ export async function getContacts(tenantId: string, query: {
   const filter: Record<string, unknown> = { tenantId };
 
   if (query.search) {
+    const escaped = query.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     filter.$or = [
-      { name: { $regex: query.search, $options: "i" } },
-      { phone: { $regex: query.search, $options: "i" } },
-      { email: { $regex: query.search, $options: "i" } },
+      { name: { $regex: escaped, $options: "i" } },
+      { phone: { $regex: escaped, $options: "i" } },
+      { email: { $regex: escaped, $options: "i" } },
     ];
   }
 

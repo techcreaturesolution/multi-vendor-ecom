@@ -71,9 +71,6 @@ export function startCampaignWorker() {
       }
 
       await message.save();
-
-      const statField = result.success ? "stats.sent" : "stats.failed";
-      await Campaign.findByIdAndUpdate(campaignId, { $inc: { [statField]: 1 } });
     },
     {
       connection: redisConnection,

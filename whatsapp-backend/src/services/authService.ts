@@ -67,7 +67,7 @@ export async function register(data: {
 
   const token = generateToken((user._id as unknown as string).toString());
 
-  return { user: sanitizeUser(user), tenant, token, otp };
+  return { user: sanitizeUser(user), tenant, token };
 }
 
 export async function login(email: string, password: string) {

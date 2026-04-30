@@ -37,7 +37,7 @@ export async function handleIncomingMessage(
 
   const tenantId = account.tenantId.toString();
 
-  let contact = await Contact.findOne({ tenantId, phone: { $regex: waMessage.from } });
+  let contact = await Contact.findOne({ tenantId, phone: "+" + waMessage.from });
   if (!contact) {
     contact = await Contact.create({
       tenantId,
@@ -115,27 +115,27 @@ export async function handleStatusUpdate(statusUpdate: WebhookStatus) {
     }
 
     await message.save();
-  }
 
-  if (message.campaignId) {
-    const statField = `stats.${statusUpdate.status}`;
-    await Campaign.findByIdAndUpdate(message.campaignId, {
-      $inc: { [statField]: 1 },
-    });
-
-    if (statusUpdate.status === "sent") {
-      await Tenant.findByIdAndUpdate(message.tenantId, {
-        $inc: { messagesUsed: 1 },
+    if (message.campaignId) {
+      const statField = `stats.${statusUpdate.status}`;
+      await Campaign.findByIdAndUpdate(message.campaignId, {
+        $inc: { [statField]: 1 },
       });
-    }
 
-    const campaign = await Campaign.findById(message.campaignId);
-    if (campaign) {
-      const totalProcessed = campaign.stats.sent + campaign.stats.failed;
-      if (totalProcessed >= campaign.stats.total && campaign.status !== "completed") {
-        campaign.status = "completed";
-        campaign.completedAt = new Date();
-        await campaign.save();
+      if (statusUpdate.status === "sent") {
+        await Tenant.findByIdAndUpdate(message.tenantId, {
+          $inc: { messagesUsed: 1 },
+        });
+      }
+
+      const campaign = await Campaign.findById(message.campaignId);
+      if (campaign) {
+        const totalProcessed = campaign.stats.sent + campaign.stats.failed;
+        if (totalProcessed >= campaign.stats.total && campaign.status !== "completed") {
+          campaign.status = "completed";
+          campaign.completedAt = new Date();
+          await campaign.save();
+        }
       }
     }
   }

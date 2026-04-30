@@ -34,12 +34,11 @@ export async function changePlan(req: TenantRequest, res: Response, next: NextFu
 
 export async function confirmPayment(req: TenantRequest, res: Response, next: NextFunction) {
   try {
-    const { razorpayOrderId, razorpayPaymentId, razorpaySignature, plan } = req.body;
+    const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
     const result = await subscriptionService.confirmPayment(req.tenantId!, {
       razorpayOrderId,
       razorpayPaymentId,
       razorpaySignature,
-      plan,
     });
     res.json(result);
   } catch (error) {
